@@ -1,0 +1,16 @@
+apiVersion: 1
+
+providers:
+  - name: 'default'
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      # dashboards live in a SEPARATE folder from this yml, otherwise Grafana
+      # would try to parse this provider file as a dashboard.
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

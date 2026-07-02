@@ -1,0 +1,65 @@
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.5.3  # <-- change tag here (8.5.11 does not exist; 8.5.x ends at 8.5.3)
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false          # disables auth/TLS so Grafana can connect with no creds (dev only)
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - es-net
+
+  # one-shot container: waits for ES to be healthy, creates the index + loads sample data, then exits
+  es-seed:
+    image: curlimages/curl:8.5.0
+    container_name: es-seed
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - ./seed:/seed:ro
+    entrypoint: ["sh", "/seed/seed.sh"]
+    restart: "no"
+    networks:
+      - es-net
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.5.3   # keep in lockstep with the elasticsearch tag
+    container_name: kibana
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200   # no creds needed since ES security is disabled
+    ports:
+      - "5601:5601"
+    networks:
+      - es-net
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: es-grafana   # avoids clashing with the 'grafana' container from other compose projects
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - es-net
+
+networks:
+  es-net:
+    driver: bridge
