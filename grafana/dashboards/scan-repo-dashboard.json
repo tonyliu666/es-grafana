@@ -42,35 +42,45 @@
   "panels": [
     {
       "id": 1, "type": "stat", "title": "Total findings",
+      "description": "All scan findings (compliant + non-compliant) in the current Project / Repo / Branch selection.",
       "gridPos": { "h": 4, "w": 5, "x": 0, "y": 0 },
       "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
       "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
         "query": "project:($project) AND repoName:($repo) AND branch:($branch)",
-        "metrics": [ { "id": "1", "type": "count" } ], "bucketAggs": [], "timeField": "@timestamp" } ],
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" }
+        "metrics": [ { "id": "1", "type": "count" } ],
+        "bucketAggs": [ { "id": "2", "type": "date_histogram", "field": "@timestamp", "settings": { "interval": "auto", "min_doc_count": "0" } } ],
+        "timeField": "@timestamp" } ],
+      "options": { "reduceOptions": { "calcs": ["sum"] }, "colorMode": "background", "graphMode": "none" }
     },
     {
       "id": 2, "type": "stat", "title": "Non-compliant",
+      "description": "Findings that violate a rule (status = non_compliant). Lower is better — shown in red.",
       "gridPos": { "h": 4, "w": 5, "x": 5, "y": 0 },
       "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
       "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
         "query": "status:non_compliant AND project:($project) AND repoName:($repo) AND branch:($branch)",
-        "metrics": [ { "id": "1", "type": "count" } ], "bucketAggs": [], "timeField": "@timestamp" } ],
+        "metrics": [ { "id": "1", "type": "count" } ],
+        "bucketAggs": [ { "id": "2", "type": "date_histogram", "field": "@timestamp", "settings": { "interval": "auto", "min_doc_count": "0" } } ],
+        "timeField": "@timestamp" } ],
       "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "red" } }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" }
+      "options": { "reduceOptions": { "calcs": ["sum"] }, "colorMode": "background", "graphMode": "none" }
     },
     {
       "id": 3, "type": "stat", "title": "Compliant",
+      "description": "Findings that pass the rules (status = compliant). Higher is better — shown in green.",
       "gridPos": { "h": 4, "w": 5, "x": 10, "y": 0 },
       "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
       "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
         "query": "status:compliant AND project:($project) AND repoName:($repo) AND branch:($branch)",
-        "metrics": [ { "id": "1", "type": "count" } ], "bucketAggs": [], "timeField": "@timestamp" } ],
+        "metrics": [ { "id": "1", "type": "count" } ],
+        "bucketAggs": [ { "id": "2", "type": "date_histogram", "field": "@timestamp", "settings": { "interval": "auto", "min_doc_count": "0" } } ],
+        "timeField": "@timestamp" } ],
       "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "green" } }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" }
+      "options": { "reduceOptions": { "calcs": ["sum"] }, "colorMode": "background", "graphMode": "none" }
     },
     {
       "id": 4, "type": "piechart", "title": "Compliant vs Non-compliant",
+      "description": "Share of compliant (green) vs non-compliant (red) findings for the current selection. Legend shows count and percent.",
       "gridPos": { "h": 8, "w": 9, "x": 15, "y": 0 },
       "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
       "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
@@ -101,7 +111,8 @@
       "options": { "orientation": "horizontal", "showValue": "auto" }
     },
     {
-      "id": 6, "type": "barchart", "title": "Findings by repo (stacked by status)",
+      "id": 6, "type": "barchart", "title": "Findings by repo — compliant vs non-compliant",
+      "description": "One bar per repository. Green = compliant findings, red = non-compliant, stacked so the full bar is that repo's total. Repos are sorted by total findings.",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
       "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
@@ -112,8 +123,17 @@
           { "id": "2", "type": "terms", "field": "repoName", "settings": { "size": "20", "order": "desc", "orderBy": "_count" } }
         ],
         "timeField": "@timestamp" } ],
-      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 80, "stacking": { "mode": "normal" } } }, "overrides": [] },
-      "options": { "orientation": "horizontal", "showValue": "auto" }
+      "transformations": [
+        { "id": "groupingToMatrix", "options": { "columnField": "status", "rowField": "repoName", "valueField": "Count", "emptyValue": "zero" } }
+      ],
+      "fieldConfig": {
+        "defaults": { "custom": { "fillOpacity": 85, "stacking": { "mode": "normal" }, "gradientMode": "none" } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "non_compliant" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }, { "id": "displayName", "value": "Non-compliant" } ] },
+          { "matcher": { "id": "byName", "options": "compliant" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }, { "id": "displayName", "value": "Compliant" } ] }
+        ]
+      },
+      "options": { "orientation": "horizontal", "showValue": "always", "stacking": "normal", "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
     },
     {
       "id": 7, "type": "timeseries", "title": "Findings over time by severity",
