@@ -1,0 +1,175 @@
+{
+  "uid": "scan-repo-overview",
+  "title": "Repo Compliance Scan (Elasticsearch)",
+  "tags": ["elasticsearch", "scan-repo", "compliance"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "project",
+        "label": "Project",
+        "type": "query",
+        "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+        "query": "{\"find\": \"terms\", \"field\": \"project\"}",
+        "includeAll": true, "multi": true, "allValue": "*",
+        "current": { "text": "All", "value": "$__all" }, "refresh": 2
+      },
+      {
+        "name": "repo",
+        "label": "Repo",
+        "type": "query",
+        "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+        "query": "{\"find\": \"terms\", \"field\": \"repoName\"}",
+        "includeAll": true, "multi": true, "allValue": "*",
+        "current": { "text": "All", "value": "$__all" }, "refresh": 2
+      },
+      {
+        "name": "branch",
+        "label": "Branch",
+        "type": "query",
+        "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+        "query": "{\"find\": \"terms\", \"field\": \"branch\"}",
+        "includeAll": true, "multi": true, "allValue": "*",
+        "current": { "text": "All", "value": "$__all" }, "refresh": 2
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Total findings",
+      "gridPos": { "h": 4, "w": 5, "x": 0, "y": 0 },
+      "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+      "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+        "query": "project:($project) AND repoName:($repo) AND branch:($branch)",
+        "metrics": [ { "id": "1", "type": "count" } ], "bucketAggs": [], "timeField": "@timestamp" } ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" }
+    },
+    {
+      "id": 2, "type": "stat", "title": "Non-compliant",
+      "gridPos": { "h": 4, "w": 5, "x": 5, "y": 0 },
+      "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+      "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+        "query": "status:non_compliant AND project:($project) AND repoName:($repo) AND branch:($branch)",
+        "metrics": [ { "id": "1", "type": "count" } ], "bucketAggs": [], "timeField": "@timestamp" } ],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "red" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" }
+    },
+    {
+      "id": 3, "type": "stat", "title": "Compliant",
+      "gridPos": { "h": 4, "w": 5, "x": 10, "y": 0 },
+      "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+      "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+        "query": "status:compliant AND project:($project) AND repoName:($repo) AND branch:($branch)",
+        "metrics": [ { "id": "1", "type": "count" } ], "bucketAggs": [], "timeField": "@timestamp" } ],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "green" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" }
+    },
+    {
+      "id": 4, "type": "piechart", "title": "Compliant vs Non-compliant",
+      "gridPos": { "h": 8, "w": 9, "x": 15, "y": 0 },
+      "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+      "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+        "query": "project:($project) AND repoName:($repo) AND branch:($branch)",
+        "metrics": [ { "id": "1", "type": "count" } ],
+        "bucketAggs": [ { "id": "2", "type": "terms", "field": "status", "settings": { "size": "5", "order": "desc", "orderBy": "_count" } } ],
+        "timeField": "@timestamp" } ],
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } }, "overrides": [
+        { "matcher": { "id": "byName", "options": "non_compliant" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } } ] },
+        { "matcher": { "id": "byName", "options": "compliant" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } } ] }
+      ] },
+      "options": {
+        "reduceOptions": { "values": true, "calcs": [] },
+        "legend": { "displayMode": "list", "placement": "right", "values": ["value", "percent"] },
+        "pieType": "pie"
+      }
+    },
+    {
+      "id": 5, "type": "barchart", "title": "Non-compliant by reason",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+      "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+        "query": "status:non_compliant AND project:($project) AND repoName:($repo) AND branch:($branch)",
+        "metrics": [ { "id": "1", "type": "count" } ],
+        "bucketAggs": [ { "id": "2", "type": "terms", "field": "reason", "settings": { "size": "15", "order": "desc", "orderBy": "_count" } } ],
+        "timeField": "@timestamp" } ],
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 80 } }, "overrides": [] },
+      "options": { "orientation": "horizontal", "showValue": "auto" }
+    },
+    {
+      "id": 6, "type": "barchart", "title": "Findings by repo (stacked by status)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+      "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+        "query": "project:($project) AND repoName:($repo) AND branch:($branch)",
+        "metrics": [ { "id": "1", "type": "count" } ],
+        "bucketAggs": [
+          { "id": "3", "type": "terms", "field": "status", "settings": { "size": "5", "order": "desc", "orderBy": "_count" } },
+          { "id": "2", "type": "terms", "field": "repoName", "settings": { "size": "20", "order": "desc", "orderBy": "_count" } }
+        ],
+        "timeField": "@timestamp" } ],
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 80, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "options": { "orientation": "horizontal", "showValue": "auto" }
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Findings over time by severity",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+      "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+        "query": "project:($project) AND repoName:($repo) AND branch:($branch)",
+        "metrics": [ { "id": "1", "type": "count" } ],
+        "bucketAggs": [
+          { "id": "3", "type": "terms", "field": "severity", "settings": { "size": "5", "order": "desc", "orderBy": "_count" } },
+          { "id": "2", "type": "date_histogram", "field": "@timestamp", "settings": { "interval": "auto", "min_doc_count": "0" } }
+        ],
+        "timeField": "@timestamp" } ],
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 70, "stacking": { "mode": "normal" } } }, "overrides": [] }
+    },
+    {
+      "id": 8, "type": "table", "title": "Non-compliant findings (endpoint / file / line / reason / suggestion)",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
+      "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+      "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+        "query": "status:non_compliant AND project:($project) AND repoName:($repo) AND branch:($branch)",
+        "metrics": [ { "id": "1", "type": "raw_data", "settings": { "size": "100" } } ],
+        "bucketAggs": [], "timeField": "@timestamp" } ],
+      "transformations": [
+        { "id": "organize", "options": {
+          "excludeByName": { "_id": true, "_index": true, "_type": true, "sort": true, "highlight": true, "scan_id": true },
+          "indexByName": {
+            "@timestamp": 0, "repoName": 1, "branch": 2, "severity": 3,
+            "http_method": 4, "endpoint": 5, "filename": 6, "line": 7,
+            "reason": 8, "suggestion": 9, "status": 10, "project": 11
+          }
+        } }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "filterable": true } }, "overrides": [] },
+      "options": { "showHeader": true }
+    },
+    {
+      "id": 9, "type": "table", "title": "Compliant findings (endpoint / file / line / reason / suggestion)",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 30 },
+      "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+      "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+        "query": "status:compliant AND project:($project) AND repoName:($repo) AND branch:($branch)",
+        "metrics": [ { "id": "1", "type": "raw_data", "settings": { "size": "100" } } ],
+        "bucketAggs": [], "timeField": "@timestamp" } ],
+      "transformations": [
+        { "id": "organize", "options": {
+          "excludeByName": { "_id": true, "_index": true, "_type": true, "sort": true, "highlight": true, "scan_id": true, "severity": true, "status": true },
+          "indexByName": {
+            "@timestamp": 0, "repoName": 1, "branch": 2,
+            "http_method": 3, "endpoint": 4, "filename": 5, "line": 6,
+            "reason": 7, "suggestion": 8, "project": 9
+          }
+        } }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "filterable": true } }, "overrides": [] },
+      "options": { "showHeader": true }
+    }
+  ]
+}

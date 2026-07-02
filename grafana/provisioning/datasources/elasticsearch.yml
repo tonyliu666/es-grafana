@@ -15,3 +15,17 @@ datasources:
       logMessageField: "message"
       logLevelField: "level"
       maxConcurrentShardRequests: 5
+
+  # second data source: same ES cluster, different index (scan-repo)
+  - name: Elasticsearch - scan-repo
+    uid: es-scan-repo
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    isDefault: false
+    editable: true
+    jsonData:
+      index: "scan-repo"
+      timeField: "@timestamp"
+      esVersion: "8.0.0"
+      maxConcurrentShardRequests: 5

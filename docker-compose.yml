@@ -25,7 +25,23 @@ services:
         condition: service_healthy
     volumes:
       - ./seed:/seed:ro
-    entrypoint: ["sh", "/seed/seed.sh"]
+    entrypoint: ["sh", "-c", "sh /seed/seed.sh && sh /seed/seed-scan-repo-nested.sh"]
+    restart: "no"
+    networks:
+      - es-net
+
+  # ETL step: parse the nested scan-repo-nested docs -> flat scan-repo (one doc per finding)
+  es-flatten:
+    image: python:3.12-alpine
+    container_name: es-flatten
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      es-seed:
+        condition: service_completed_successfully
+    volumes:
+      - ./seed:/seed:ro
+    entrypoint: ["python3", "/seed/flatten_scan_repo.py"]
     restart: "no"
     networks:
       - es-net
