@@ -14,9 +14,11 @@ queries + transformations, with no per-finding flat index.
 
 Two Grafana 10.4 limits are hard and cannot be worked around with transformations:
 
-1. **No array explode.** A `raw_data` query returns each `compliant` /
-   `non_compliant` array as a *single cell* (frame field type `other`) holding
-   the whole array. No transformation turns `[{...},{...}]` into N rows.
+1. **The native ES datasource cannot array-explode.** A `raw_data` query returns
+   each `compliant` / `non_compliant` array as a *single cell* (frame field type
+   `other`) holding the whole array. No transformation turns `[{...},{...}]` into
+   N rows. This is worked around with the **Infinity datasource** (see below),
+   not with a transformation.
 2. **`nested`-typed fields are invisible to normal aggregations.** A plain
    `terms` agg on `non_compliant.Reason` over the current `nested` mapping
    returns **empty**. All six aggregation panels would be blank.
@@ -66,19 +68,38 @@ Rebuild each panel against the nested arrays:
 | Non-compliant by reason (bar) | `count` bucketed `terms(non_compliant.Reason)` |
 | Findings by repo, compliant vs non (bar) | two targets (`value_count` per array) × `terms(repoName)`, merged into a matrix by transform |
 | Findings over time by severity (timeseries) | `count` bucketed `terms(non_compliant.severity)` + `date_histogram` |
-| Non-compliant findings (table) | `raw_data`; row = one scan; `non_compliant` shown as a JSON array cell |
-| Compliant findings (table) | `raw_data`; row = one scan; `compliant` shown as a JSON array cell |
+| Non-compliant findings (table) | **Infinity** datasource; JSONata `root_selector` explodes `non_compliant` into **one row per finding** |
+| Compliant findings (table) | **Infinity** datasource; JSONata `root_selector` explodes `compliant` into **one row per finding** |
 
-The template variables (`project`, `repo`, `branch`) still work — they aggregate
-on the top-level `project` / `repoName` / `branch` keyword fields, unchanged.
+The template variables (`project`, `repo`, `branch`) still work — the
+aggregation panels aggregate on the top-level `project` / `repoName` / `branch`
+keyword fields, and the Infinity tables interpolate them into the `query_string`
+of the `_search` body (`${project:lucene}` etc.) plus the dashboard time range
+into the `@timestamp` range (`${__from:date:iso}` / `${__to:date:iso}`).
+
+### Detail tables via the Infinity datasource
+
+The two per-finding tables use the `yesoreyeram-infinity-datasource` plugin
+(installed via `GF_INSTALL_PLUGINS`, provisioned as uid `es-infinity` against the
+same ES cluster). Each panel target:
+
+- `type: json`, `parser: backend`, `source: url`, `format: table`
+- POSTs the ES query DSL body to `.../scan-repo-nested/_search`
+- `root_selector` is a JSONata expression that maps over `hits.hits`, binds
+  `_source` to `$s`, and explodes the array while carrying the parent fields
+  (`@timestamp` → `Time`, `repoName`, `branch`, `project`) onto each finding.
+  It is guarded with `$count(hits.hits) > 0 ? … : []` so an empty result set
+  renders a clean "No data" instead of a JSONata evaluation error.
+- explicit `columns` fix each column's type (`Time`→timestamp, `Line`→number);
+  an `organize` transform sets the per-finding column order.
 
 ## Accepted losses
 
-- The two detail tables become **one row per scan** with findings in a JSON
-  array cell, instead of one tidy row per finding. (Grafana cannot explode
-  arrays; user accepted "degraded JSON tables".)
 - By-severity / by-repo counts undercount by 1 where a single scan repeats a
   value. Totals and by-reason remain exact.
+
+The detail tables are **not** a loss: the Infinity datasource reproduces the
+original one-row-per-finding view while ES keeps the raw nested documents.
 
 ## Verification
 

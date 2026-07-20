@@ -30,3 +30,20 @@ datasources:
       timeField: "@timestamp"
       esVersion: "8.0.0"
       maxConcurrentShardRequests: 5
+
+  # Infinity datasource pointed at the SAME ES cluster. Used only by the two
+  # detail tables: it fetches the raw nested docs from _search and explodes the
+  # compliant / non_compliant arrays into one row per finding (JSONata backend
+  # root_selector), reproducing the original per-finding tables without any
+  # flatten ETL.
+  - name: Infinity - scan-repo
+    uid: es-infinity
+    type: yesoreyeram-infinity-datasource
+    access: proxy
+    isDefault: false
+    editable: true
+    jsonData:
+      # allow the datasource to reach the in-network ES service
+      allowedHosts:
+        - http://elasticsearch:9200
+      tlsSkipVerify: true

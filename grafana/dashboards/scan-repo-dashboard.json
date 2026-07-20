@@ -176,41 +176,250 @@
         "timeField": "@timestamp" } ],
       "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 70, "stacking": { "mode": "normal" } } }, "overrides": [] }
     },
-    {
-      "id": 8, "type": "table", "title": "Non-compliant findings (raw scan docs)",
-      "description": "One row per repo scan. The non_compliant column holds the array of findings (Endpoint / FileName / Line / Reason / Suggestion / severity) as JSON — Grafana cannot explode a nested array into one row per finding.",
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
-      "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
-      "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
-        "query": "project:($project) AND repoName:($repo) AND branch:($branch)",
-        "metrics": [ { "id": "1", "type": "raw_data", "settings": { "size": "100" } } ],
-        "bucketAggs": [], "timeField": "@timestamp" } ],
-      "transformations": [
-        { "id": "organize", "options": {
-          "excludeByName": { "_id": true, "_index": true, "_type": true, "sort": true, "highlight": true, "scan_id": true, "compliant": true },
-          "indexByName": {
-            "@timestamp": 0, "repoName": 1, "branch": 2, "project": 3, "non_compliant": 4
+        {
+
+          "id": 8,
+          "type": "table",
+          "title": "Non-compliant findings",
+          "description": "One row per non-compliant finding, exploded from the nested scan documents via the Infinity datasource (JSONata). Elasticsearch keeps the raw nested arrays.",
+          "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 20
+          },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "es-infinity"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "yesoreyeram-infinity-datasource",
+                "uid": "es-infinity"
+              },
+              "type": "json",
+              "parser": "backend",
+              "source": "url",
+              "format": "table",
+              "url": "http://elasticsearch:9200/scan-repo-nested/_search",
+              "url_options": {
+                "method": "POST",
+                "body_type": "raw",
+                "body_content_type": "application/json",
+                "data": "{\"size\":100,\"query\":{\"bool\":{\"filter\":[{\"query_string\":{\"query\":\"project:(${project:lucene}) AND repoName:(${repo:lucene}) AND branch:(${branch:lucene})\"}},{\"range\":{\"@timestamp\":{\"gte\":\"${__from:date:iso}\",\"lte\":\"${__to:date:iso}\"}}}]}}}"
+              },
+              "root_selector": "$count(hits.hits) > 0 ? hits.hits.($s:=_source; $s.non_compliant.{\"Time\":$s.`@timestamp`,\"severity\":severity,\"repoName\":$s.repoName,\"branch\":$s.branch,\"project\":$s.project,\"Endpoint\":Endpoint,\"FileName\":FileName,\"Line\":Line,\"Reason\":Reason,\"Suggestion\":Suggestion}) : []",
+              "columns": [
+                {
+                  "selector": "Time",
+                  "text": "Time",
+                  "type": "timestamp",
+                  "timestampformat": "2006-01-02T15:04:05Z"
+                },
+                {
+                  "selector": "severity",
+                  "text": "severity",
+                  "type": "string"
+                },
+                {
+                  "selector": "repoName",
+                  "text": "repoName",
+                  "type": "string"
+                },
+                {
+                  "selector": "branch",
+                  "text": "branch",
+                  "type": "string"
+                },
+                {
+                  "selector": "project",
+                  "text": "project",
+                  "type": "string"
+                },
+                {
+                  "selector": "Endpoint",
+                  "text": "Endpoint",
+                  "type": "string"
+                },
+                {
+                  "selector": "FileName",
+                  "text": "FileName",
+                  "type": "string"
+                },
+                {
+                  "selector": "Line",
+                  "text": "Line",
+                  "type": "number"
+                },
+                {
+                  "selector": "Reason",
+                  "text": "Reason",
+                  "type": "string"
+                },
+                {
+                  "selector": "Suggestion",
+                  "text": "Suggestion",
+                  "type": "string"
+                }
+              ]
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "renameByName": {},
+                "indexByName": {
+                  "Time": 0,
+                  "severity": 1,
+                  "repoName": 2,
+                  "branch": 3,
+                  "project": 4,
+                  "Endpoint": 5,
+                  "FileName": 6,
+                  "Line": 7,
+                  "Reason": 8,
+                  "Suggestion": 9
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "filterable": true
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "showHeader": true
           }
+        },
         } }
       ],
       "fieldConfig": { "defaults": { "custom": { "filterable": true } }, "overrides": [] },
       "options": { "showHeader": true }
     },
     {
-      "id": 9, "type": "table", "title": "Compliant findings (raw scan docs)",
-      "description": "One row per repo scan. The compliant column holds the array of findings as JSON — Grafana cannot explode a nested array into one row per finding.",
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 30 },
-      "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
-      "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
-        "query": "project:($project) AND repoName:($repo) AND branch:($branch)",
-        "metrics": [ { "id": "1", "type": "raw_data", "settings": { "size": "100" } } ],
-        "bucketAggs": [], "timeField": "@timestamp" } ],
+      "id": 9,
+      "type": "table",
+      "title": "Compliant findings",
+      "description": "One row per compliant finding, exploded from the nested scan documents via the Infinity datasource (JSONata). Elasticsearch keeps the raw nested arrays.",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 30
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "es-infinity"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "es-infinity"
+          },
+          "type": "json",
+          "parser": "backend",
+          "source": "url",
+          "format": "table",
+          "url": "http://elasticsearch:9200/scan-repo-nested/_search",
+          "url_options": {
+            "method": "POST",
+            "body_type": "raw",
+            "body_content_type": "application/json",
+            "data": "{\"size\":100,\"query\":{\"bool\":{\"filter\":[{\"query_string\":{\"query\":\"project:(${project:lucene}) AND repoName:(${repo:lucene}) AND branch:(${branch:lucene})\"}},{\"range\":{\"@timestamp\":{\"gte\":\"${__from:date:iso}\",\"lte\":\"${__to:date:iso}\"}}}]}}}"
+          },
+          "root_selector": "$count(hits.hits) > 0 ? hits.hits.($s:=_source; $s.compliant.{\"Time\":$s.`@timestamp`,\"repoName\":$s.repoName,\"branch\":$s.branch,\"project\":$s.project,\"Endpoint\":Endpoint,\"FileName\":FileName,\"Line\":Line,\"Reason\":Reason,\"Suggestion\":Suggestion}) : []",
+          "columns": [
+            {
+              "selector": "Time",
+              "text": "Time",
+              "type": "timestamp",
+              "timestampformat": "2006-01-02T15:04:05Z"
+            },
+            {
+              "selector": "repoName",
+              "text": "repoName",
+              "type": "string"
+            },
+            {
+              "selector": "branch",
+              "text": "branch",
+              "type": "string"
+            },
+            {
+              "selector": "project",
+              "text": "project",
+              "type": "string"
+            },
+            {
+              "selector": "Endpoint",
+              "text": "Endpoint",
+              "type": "string"
+            },
+            {
+              "selector": "FileName",
+              "text": "FileName",
+              "type": "string"
+            },
+            {
+              "selector": "Line",
+              "text": "Line",
+              "type": "number"
+            },
+            {
+              "selector": "Reason",
+              "text": "Reason",
+              "type": "string"
+            },
+            {
+              "selector": "Suggestion",
+              "text": "Suggestion",
+              "type": "string"
+            }
+          ]
+        }
+      ],
       "transformations": [
-        { "id": "organize", "options": {
-          "excludeByName": { "_id": true, "_index": true, "_type": true, "sort": true, "highlight": true, "scan_id": true, "non_compliant": true },
-          "indexByName": {
-            "@timestamp": 0, "repoName": 1, "branch": 2, "project": 3, "compliant": 4
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "renameByName": {},
+            "indexByName": {
+              "Time": 0,
+              "repoName": 1,
+              "branch": 2,
+              "project": 3,
+              "Endpoint": 4,
+              "FileName": 5,
+              "Line": 6,
+              "Reason": 7,
+              "Suggestion": 8
+            }
           }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    }
         } }
       ],
       "fieldConfig": { "defaults": { "custom": { "filterable": true } }, "overrides": [] },

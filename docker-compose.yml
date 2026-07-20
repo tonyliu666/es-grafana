@@ -54,6 +54,12 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      # Infinity datasource: lets Grafana query ES _search and EXPLODE the nested
+      # compliant/non_compliant arrays into one row per finding (via a JSONata
+      # backend root_selector), so the detail tables match the original per-finding
+      # UI while ES keeps the raw nested documents. Native ES datasource still
+      # drives the aggregation panels.
+      - GF_INSTALL_PLUGINS=yesoreyeram-infinity-datasource
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro

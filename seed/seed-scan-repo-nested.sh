@@ -5,9 +5,11 @@
 # (non_compliant also carries a severity). Stored as ES "object" (the default):
 # ES flattens each array into multi-valued fields at the document level, which
 # lets Grafana aggregate them directly (terms/value_count on non_compliant.*).
-# This is what makes the dashboard work WITHOUT the old flatten ETL. The trade-off
-# is that object-flattening loses per-element correlation, so a raw_data query
-# still returns each array as one JSON cell (Grafana can't explode it into rows).
+# This is what makes the aggregation panels work WITHOUT the old flatten ETL.
+# object-flattening loses per-element correlation for the native ES datasource
+# (a raw_data query returns each array as one JSON cell), so the two per-finding
+# detail tables instead read _source via the Infinity datasource and explode the
+# arrays into one row per finding with a JSONata root_selector.
 set -e
 
 ES="${ES:-http://elasticsearch:9200}"
