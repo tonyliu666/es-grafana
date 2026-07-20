@@ -1,0 +1,108 @@
+{
+    "_index": "scan-repo-nested",
+    "_id": "kcgwgJ8BEXwVlFBv6Tzk",
+    "_version": 1,
+    "_score": 0,
+    "_source": {
+        "@timestamp": "2026-07-20T15:31:57Z",
+        "scan_id": "payments-service-master",
+        "repoName": "payments-service",
+        "branch": "master",
+        "project": "testing",
+        "non_compliant": [
+            {
+                "Endpoint": "POST /api/payments",
+                "FileName": "PaymentController.java",
+                "Line": 88,
+                "Reason": "SQL injection",
+                "Suggestion": "Use parameterized queries / prepared statements",
+                "severity": "high"
+            },
+            {
+                "Endpoint": "POST /api/payments/refund",
+                "FileName": "PaymentController.java",
+                "Line": 142,
+                "Reason": "Hardcoded credentials",
+                "Suggestion": "Move secrets to a secrets manager",
+                "severity": "high"
+            }
+        ],
+        "compliant": [
+            {
+                "Endpoint": "GET /api/payments/{id}",
+                "FileName": "PaymentController.java",
+                "Line": 51,
+                "Reason": "Parameterized query used",
+                "Suggestion": "No action needed"
+            },
+            {
+                "Endpoint": "GET /api/health",
+                "FileName": "HealthController.java",
+                "Line": 12,
+                "Reason": "Authentication enforced",
+                "Suggestion": "No action needed"
+            }
+        ]
+    },
+    "fields": {
+        "non_compliant.FileName": [
+            "PaymentController.java",
+            "PaymentController.java"
+        ],
+        "repoName": [
+            "payments-service"
+        ],
+        "project": [
+            "testing"
+        ],
+        "non_compliant.Endpoint": [
+            "POST /api/payments",
+            "POST /api/payments/refund"
+        ],
+        "compliant.Endpoint": [
+            "GET /api/payments/{id}",
+            "GET /api/health"
+        ],
+        "branch": [
+            "master"
+        ],
+        "compliant.Reason": [
+            "Parameterized query used",
+            "Authentication enforced"
+        ],
+        "non_compliant.severity": [
+            "high",
+            "high"
+        ],
+        "@timestamp": [
+            "2026-07-20T15:31:57.000Z"
+        ],
+        "non_compliant.Reason": [
+            "SQL injection",
+            "Hardcoded credentials"
+        ],
+        "compliant.Line": [
+            51,
+            12
+        ],
+        "non_compliant.Line": [
+            88,
+            142
+        ],
+        "compliant.FileName": [
+            "PaymentController.java",
+            "HealthController.java"
+        ],
+        "compliant.Suggestion": [
+            "No action needed",
+            "No action needed"
+        ],
+        "scan_id": [
+            "payments-service-master"
+        ],
+        "non_compliant.Suggestion": [
+            "Use parameterized queries / prepared statements",
+            "Move secrets to a secrets manager"
+        ]
+    }
+}

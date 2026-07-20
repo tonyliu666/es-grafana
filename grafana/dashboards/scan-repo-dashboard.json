@@ -8,6 +8,7 @@
   "editable": true,
   "refresh": "30s",
   "time": { "from": "now-6h", "to": "now" },
+  "description": "Reads the RAW nested scan-repo-nested index directly (no flatten ETL). Aggregation panels count array elements via value_count/terms on the object-flattened arrays; the two detail tables show one row per scan with findings as JSON array cells (Grafana can't explode arrays into rows).",
   "templating": {
     "list": [
       {
@@ -42,24 +43,30 @@
   "panels": [
     {
       "id": 1, "type": "stat", "title": "Total findings",
-      "description": "All scan findings (compliant + non-compliant) in the current Project / Repo / Branch selection.",
+      "description": "All scan findings (compliant + non-compliant). value_count on both arrays, summed per time bucket then over the range.",
       "gridPos": { "h": 4, "w": 5, "x": 0, "y": 0 },
       "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
       "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
         "query": "project:($project) AND repoName:($repo) AND branch:($branch)",
-        "metrics": [ { "id": "1", "type": "count" } ],
+        "metrics": [
+          { "id": "1", "type": "value_count", "field": "non_compliant.Reason", "hide": true },
+          { "id": "3", "type": "value_count", "field": "compliant.Reason", "hide": true },
+          { "id": "4", "type": "bucket_script",
+            "pipelineVariables": [ { "name": "a", "pipelineAgg": "1" }, { "name": "b", "pipelineAgg": "3" } ],
+            "settings": { "script": "params.a + params.b" } }
+        ],
         "bucketAggs": [ { "id": "2", "type": "date_histogram", "field": "@timestamp", "settings": { "interval": "auto", "min_doc_count": "0" } } ],
         "timeField": "@timestamp" } ],
       "options": { "reduceOptions": { "calcs": ["sum"] }, "colorMode": "background", "graphMode": "none" }
     },
     {
       "id": 2, "type": "stat", "title": "Non-compliant",
-      "description": "Findings that violate a rule (status = non_compliant). Lower is better — shown in red.",
+      "description": "Number of non-compliant findings (value_count of non_compliant array elements). Lower is better — red.",
       "gridPos": { "h": 4, "w": 5, "x": 5, "y": 0 },
       "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
       "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
-        "query": "status:non_compliant AND project:($project) AND repoName:($repo) AND branch:($branch)",
-        "metrics": [ { "id": "1", "type": "count" } ],
+        "query": "project:($project) AND repoName:($repo) AND branch:($branch)",
+        "metrics": [ { "id": "1", "type": "value_count", "field": "non_compliant.Reason" } ],
         "bucketAggs": [ { "id": "2", "type": "date_histogram", "field": "@timestamp", "settings": { "interval": "auto", "min_doc_count": "0" } } ],
         "timeField": "@timestamp" } ],
       "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "red" } }, "overrides": [] },
@@ -67,12 +74,12 @@
     },
     {
       "id": 3, "type": "stat", "title": "Compliant",
-      "description": "Findings that pass the rules (status = compliant). Higher is better — shown in green.",
+      "description": "Number of compliant findings (value_count of compliant array elements). Higher is better — green.",
       "gridPos": { "h": 4, "w": 5, "x": 10, "y": 0 },
       "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
       "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
-        "query": "status:compliant AND project:($project) AND repoName:($repo) AND branch:($branch)",
-        "metrics": [ { "id": "1", "type": "count" } ],
+        "query": "project:($project) AND repoName:($repo) AND branch:($branch)",
+        "metrics": [ { "id": "1", "type": "value_count", "field": "compliant.Reason" } ],
         "bucketAggs": [ { "id": "2", "type": "date_histogram", "field": "@timestamp", "settings": { "interval": "auto", "min_doc_count": "0" } } ],
         "timeField": "@timestamp" } ],
       "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "green" } }, "overrides": [] },
@@ -80,14 +87,24 @@
     },
     {
       "id": 4, "type": "piechart", "title": "Compliant vs Non-compliant",
-      "description": "Share of compliant (green) vs non-compliant (red) findings for the current selection. Legend shows count and percent.",
+      "description": "Share of compliant (green) vs non-compliant (red) findings. Two value_count series, one per array, reduced to totals.",
       "gridPos": { "h": 8, "w": 9, "x": 15, "y": 0 },
       "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
-      "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
-        "query": "project:($project) AND repoName:($repo) AND branch:($branch)",
-        "metrics": [ { "id": "1", "type": "count" } ],
-        "bucketAggs": [ { "id": "2", "type": "terms", "field": "status", "settings": { "size": "5", "order": "desc", "orderBy": "_count" } } ],
-        "timeField": "@timestamp" } ],
+      "targets": [
+        { "refId": "A", "alias": "non_compliant", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+          "query": "project:($project) AND repoName:($repo) AND branch:($branch)",
+          "metrics": [ { "id": "1", "type": "value_count", "field": "non_compliant.Reason" } ],
+          "bucketAggs": [ { "id": "2", "type": "date_histogram", "field": "@timestamp", "settings": { "interval": "auto", "min_doc_count": "0" } } ],
+          "timeField": "@timestamp" },
+        { "refId": "B", "alias": "compliant", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+          "query": "project:($project) AND repoName:($repo) AND branch:($branch)",
+          "metrics": [ { "id": "1", "type": "value_count", "field": "compliant.Reason" } ],
+          "bucketAggs": [ { "id": "2", "type": "date_histogram", "field": "@timestamp", "settings": { "interval": "auto", "min_doc_count": "0" } } ],
+          "timeField": "@timestamp" }
+      ],
+      "transformations": [
+        { "id": "reduce", "options": { "reducers": ["sum"], "includeTimeField": false, "mode": "seriesToRows" } }
+      ],
       "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } }, "overrides": [
         { "matcher": { "id": "byName", "options": "non_compliant" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } } ] },
         { "matcher": { "id": "byName", "options": "compliant" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } } ] }
@@ -100,31 +117,40 @@
     },
     {
       "id": 5, "type": "barchart", "title": "Non-compliant by reason",
+      "description": "Count of non-compliant findings grouped by reason (terms on non_compliant.Reason).",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
       "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
       "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
-        "query": "status:non_compliant AND project:($project) AND repoName:($repo) AND branch:($branch)",
+        "query": "project:($project) AND repoName:($repo) AND branch:($branch)",
         "metrics": [ { "id": "1", "type": "count" } ],
-        "bucketAggs": [ { "id": "2", "type": "terms", "field": "reason", "settings": { "size": "15", "order": "desc", "orderBy": "_count" } } ],
+        "bucketAggs": [ { "id": "2", "type": "terms", "field": "non_compliant.Reason", "settings": { "size": "15", "order": "desc", "orderBy": "_count" } } ],
         "timeField": "@timestamp" } ],
       "fieldConfig": { "defaults": { "custom": { "fillOpacity": 80 } }, "overrides": [] },
       "options": { "orientation": "horizontal", "showValue": "auto" }
     },
     {
       "id": 6, "type": "barchart", "title": "Findings by repo — compliant vs non-compliant",
-      "description": "One bar per repository. Green = compliant findings, red = non-compliant, stacked so the full bar is that repo's total. Repos are sorted by total findings.",
+      "description": "One bar per repository. Green = compliant findings (value_count of compliant array), red = non-compliant, stacked. Two queries merged by repoName.",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
-      "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
-        "query": "project:($project) AND repoName:($repo) AND branch:($branch)",
-        "metrics": [ { "id": "1", "type": "count" } ],
-        "bucketAggs": [
-          { "id": "3", "type": "terms", "field": "status", "settings": { "size": "5", "order": "desc", "orderBy": "_count" } },
-          { "id": "2", "type": "terms", "field": "repoName", "settings": { "size": "20", "order": "desc", "orderBy": "_count" } }
-        ],
-        "timeField": "@timestamp" } ],
+      "targets": [
+        { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
+          "query": "project:($project) AND repoName:($repo) AND branch:($branch)",
+          "metrics": [
+            { "id": "1", "type": "value_count", "field": "non_compliant.Reason" },
+            { "id": "3", "type": "value_count", "field": "compliant.Reason" }
+          ],
+          "bucketAggs": [ { "id": "2", "type": "terms", "field": "repoName", "settings": { "size": "20", "order": "desc", "orderBy": "_count" } } ],
+          "timeField": "@timestamp" }
+      ],
       "transformations": [
-        { "id": "groupingToMatrix", "options": { "columnField": "status", "rowField": "repoName", "valueField": "Count", "emptyValue": "zero" } }
+        { "id": "organize", "options": {
+          "excludeByName": {},
+          "renameByName": {
+            "value_count non_compliant.Reason": "non_compliant",
+            "value_count compliant.Reason": "compliant"
+          }
+        } }
       ],
       "fieldConfig": {
         "defaults": { "custom": { "fillOpacity": 85, "stacking": { "mode": "normal" }, "gradientMode": "none" } },
@@ -133,37 +159,37 @@
           { "matcher": { "id": "byName", "options": "compliant" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }, { "id": "displayName", "value": "Compliant" } ] }
         ]
       },
-      "options": { "orientation": "horizontal", "showValue": "always", "stacking": "normal", "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+      "options": { "orientation": "horizontal", "showValue": "always", "stacking": "normal", "xField": "repoName", "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
     },
     {
       "id": 7, "type": "timeseries", "title": "Findings over time by severity",
+      "description": "Non-compliant findings over time, grouped by severity (terms on non_compliant.severity). Note: a scan with two findings of the same severity is counted once per bucket, so this can undercount slightly vs the exact total.",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
       "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
       "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
         "query": "project:($project) AND repoName:($repo) AND branch:($branch)",
         "metrics": [ { "id": "1", "type": "count" } ],
         "bucketAggs": [
-          { "id": "3", "type": "terms", "field": "severity", "settings": { "size": "5", "order": "desc", "orderBy": "_count" } },
+          { "id": "3", "type": "terms", "field": "non_compliant.severity", "settings": { "size": "5", "order": "desc", "orderBy": "_count" } },
           { "id": "2", "type": "date_histogram", "field": "@timestamp", "settings": { "interval": "auto", "min_doc_count": "0" } }
         ],
         "timeField": "@timestamp" } ],
       "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 70, "stacking": { "mode": "normal" } } }, "overrides": [] }
     },
     {
-      "id": 8, "type": "table", "title": "Non-compliant findings (endpoint / file / line / reason / suggestion)",
+      "id": 8, "type": "table", "title": "Non-compliant findings (raw scan docs)",
+      "description": "One row per repo scan. The non_compliant column holds the array of findings (Endpoint / FileName / Line / Reason / Suggestion / severity) as JSON — Grafana cannot explode a nested array into one row per finding.",
       "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
       "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
       "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
-        "query": "status:non_compliant AND project:($project) AND repoName:($repo) AND branch:($branch)",
+        "query": "project:($project) AND repoName:($repo) AND branch:($branch)",
         "metrics": [ { "id": "1", "type": "raw_data", "settings": { "size": "100" } } ],
         "bucketAggs": [], "timeField": "@timestamp" } ],
       "transformations": [
         { "id": "organize", "options": {
-          "excludeByName": { "_id": true, "_index": true, "_type": true, "sort": true, "highlight": true, "scan_id": true },
+          "excludeByName": { "_id": true, "_index": true, "_type": true, "sort": true, "highlight": true, "scan_id": true, "compliant": true },
           "indexByName": {
-            "@timestamp": 0, "repoName": 1, "branch": 2, "severity": 3,
-            "http_method": 4, "endpoint": 5, "filename": 6, "line": 7,
-            "reason": 8, "suggestion": 9, "status": 10, "project": 11
+            "@timestamp": 0, "repoName": 1, "branch": 2, "project": 3, "non_compliant": 4
           }
         } }
       ],
@@ -171,20 +197,19 @@
       "options": { "showHeader": true }
     },
     {
-      "id": 9, "type": "table", "title": "Compliant findings (endpoint / file / line / reason / suggestion)",
+      "id": 9, "type": "table", "title": "Compliant findings (raw scan docs)",
+      "description": "One row per repo scan. The compliant column holds the array of findings as JSON — Grafana cannot explode a nested array into one row per finding.",
       "gridPos": { "h": 10, "w": 24, "x": 0, "y": 30 },
       "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
       "targets": [ { "refId": "A", "datasource": { "type": "elasticsearch", "uid": "es-scan-repo" },
-        "query": "status:compliant AND project:($project) AND repoName:($repo) AND branch:($branch)",
+        "query": "project:($project) AND repoName:($repo) AND branch:($branch)",
         "metrics": [ { "id": "1", "type": "raw_data", "settings": { "size": "100" } } ],
         "bucketAggs": [], "timeField": "@timestamp" } ],
       "transformations": [
         { "id": "organize", "options": {
-          "excludeByName": { "_id": true, "_index": true, "_type": true, "sort": true, "highlight": true, "scan_id": true, "severity": true, "status": true },
+          "excludeByName": { "_id": true, "_index": true, "_type": true, "sort": true, "highlight": true, "scan_id": true, "non_compliant": true },
           "indexByName": {
-            "@timestamp": 0, "repoName": 1, "branch": 2,
-            "http_method": 3, "endpoint": 4, "filename": 5, "line": 6,
-            "reason": 7, "suggestion": 8, "project": 9
+            "@timestamp": 0, "repoName": 1, "branch": 2, "project": 3, "compliant": 4
           }
         } }
       ],

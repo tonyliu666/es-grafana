@@ -16,7 +16,8 @@ datasources:
       logLevelField: "level"
       maxConcurrentShardRequests: 5
 
-  # second data source: same ES cluster, different index (scan-repo)
+  # second data source: same ES cluster, the RAW nested scan index.
+  # No flatten ETL — Grafana aggregates the object-flattened arrays directly.
   - name: Elasticsearch - scan-repo
     uid: es-scan-repo
     type: elasticsearch
@@ -25,7 +26,7 @@ datasources:
     isDefault: false
     editable: true
     jsonData:
-      index: "scan-repo"
+      index: "scan-repo-nested"
       timeField: "@timestamp"
       esVersion: "8.0.0"
       maxConcurrentShardRequests: 5

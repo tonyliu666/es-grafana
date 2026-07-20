@@ -2,9 +2,12 @@
 # Index 1 of 2: the REALISTIC source-of-truth shape.
 # One document per repo scan. compliant / non_compliant are ARRAYS of objects
 # with the fields you specified: Endpoint, FileName, Line, Reason, Suggestion
-# (non_compliant also carries a severity). Stored as ES "nested" so array
-# elements keep their object boundaries. This index is great for storage/search
-# but Grafana can't aggregate nested arrays -> see flatten_scan_repo.py.
+# (non_compliant also carries a severity). Stored as ES "object" (the default):
+# ES flattens each array into multi-valued fields at the document level, which
+# lets Grafana aggregate them directly (terms/value_count on non_compliant.*).
+# This is what makes the dashboard work WITHOUT the old flatten ETL. The trade-off
+# is that object-flattening loses per-element correlation, so a raw_data query
+# still returns each array as one JSON cell (Grafana can't explode it into rows).
 set -e
 
 ES="${ES:-http://elasticsearch:9200}"
@@ -22,7 +25,7 @@ curl -s -o /dev/null -w "create index -> HTTP %{http_code}\n" \
       "branch":     { "type": "keyword" },
       "project":    { "type": "keyword" },
       "compliant": {
-        "type": "nested",
+        "type": "object",
         "properties": {
           "Endpoint":   { "type": "keyword" },
           "FileName":   { "type": "keyword" },
@@ -32,7 +35,7 @@ curl -s -o /dev/null -w "create index -> HTTP %{http_code}\n" \
         }
       },
       "non_compliant": {
-        "type": "nested",
+        "type": "object",
         "properties": {
           "Endpoint":   { "type": "keyword" },
           "FileName":   { "type": "keyword" },
